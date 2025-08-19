@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NX Prüfungsreport</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .status-PASS { background: #dcfce7; color: #166534; }
+    .status-FAIL { background: #fee2e2; color: #991b1b; }
+    .status-WARN { background: #fef9c3; color: #854d0e; }
+    .badge { border-radius: 9999px; padding: 0.125rem 0.5rem; font-weight: 600; font-size: 0.75rem; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+    <header class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">NX Prüfungsreport</h1>
+        <!-- <p class="text-sm text-slate-500">Quelle: web/data/latest.json</p> -->
+      </div>
+      <div class="flex gap-2">
+        <button id="btnExportCSV" class="px-3 py-2 rounded-xl shadow bg-white hover:bg-slate-100 text-sm">CSV exportieren</button>
+        <button id="btnExportJSON" class="px-3 py-2 rounded-xl shadow bg-white hover:bg-slate-100 text-sm">JSON exportieren</button>
+        <button id="btnRefresh" class="px-3 py-2 rounded-xl shadow bg-white hover:bg-slate-100 text-sm">Neu laden</button>
+      </div>
+    </header>
+
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Projekt</div><div id="sumProject" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Zeitstempel</div><div id="sumTimestamp" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Dateien</div><div id="sumFiles" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Prüfungen</div><div id="sumChecks" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4 flex items-center gap-2">
+        <span class="badge status-PASS">PASS <span id="sumPass">0</span></span>
+        <span class="badge status-WARN">WARN <span id="sumWarn">0</span></span>
+        <span class="badge status-FAIL">FAIL <span id="sumFail">0</span></span>
+      </div>
+    </section>
+
+    <section class="flex flex-col md:flex-row gap-3">
+      <input id="search" type="search" placeholder="Suche nach Datei oder Prüfung…" class="w-full md:w-80 px-3 py-2 rounded-xl bg-white shadow outline-none focus:ring" />
+      <select id="statusFilter" class="px-3 py-2 rounded-xl bg-white shadow w-full md:w-48">
+        <option value="ALL">Status: Alle</option>
+        <option value="PASS">Nur PASS</option>
+        <option value="WARN">Nur WARN</option>
+        <option value="FAIL">Nur FAIL</option>
+      </select>
+      <select id="fileFilter" class="px-3 py-2 rounded-xl bg-white shadow w-full md:w-64">
+        <option value="ALL">Datei: Alle</option>
+      </select>
+    </section>
+
+    <section class="rounded-2xl bg-white shadow overflow-hidden">
+      <div class="max-h-[60vh] overflow-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-100 sticky top-0">
+            <tr>
+              <th class="text-left font-semibold px-4 py-2">Datei</th>
+              <th class="text-left font-semibold px-4 py-2">Prüfung</th>
+              <th class="text-left font-semibold px-4 py-2">Status</th>
+              <th class="text-left font-semibold px-4 py-2">Nachricht</th>
+              <th class="text-right font-semibold px-4 py-2">Dauer</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="perFile" class="space-y-2"></section>
+   <!-- <footer class="pt-6 text-xs text-slate-500">© Beispiel – anpassbar an nx-testframework Output</footer> -->
+  </div>
+
+<script>
+let report = null;
+let rows = [];
+
+function toRows(rep){
+  const rows=[];
+  for (const [file, checks] of Object.entries(rep.files||{})){
+    for (const chk of checks){
+      rows.push({
+        file,
+        check: `${chk.id||''} – ${chk.name||''}`.trim(),
+        status: chk.status||'PASS',
+        message: chk.message||'',
+        duration_ms: chk.duration_ms||0
+      });
+    }
+  }
+  return rows;
+}
+
+function summarize(rows){
+  const sum = { files: new Set(), checks: rows.length, PASS:0, WARN:0, FAIL:0 };
+  for(const r of rows){ sum.files.add(r.file); if(sum[r.status]!==undefined) sum[r.status]++; }
+  return { files: sum.files.size, checks: sum.checks, PASS: sum.PASS, WARN: sum.WARN, FAIL: sum.FAIL };
+}
+
+function hydrateSummary(rows, report){
+  const s = summarize(rows);
+  document.getElementById('sumProject').textContent   = report.project || '—';
+  document.getElementById('sumTimestamp').textContent = report.timestamp || '—';
+  document.getElementById('sumFiles').textContent     = s.files;
+  document.getElementById('sumChecks').textContent    = s.checks;
+  document.getElementById('sumPass').textContent      = s.PASS;
+  document.getElementById('sumWarn').textContent      = s.WARN;
+  document.getElementById('sumFail').textContent      = s.FAIL;
+}
+
+const search = document.getElementById('search');
+const statusFilter = document.getElementById('statusFilter');
+const fileFilter = document.getElementById('fileFilter');
+const tbody = document.getElementById('tbody');
+const perFile = document.getElementById('perFile');
+
+function applyFilters(){
+  const q = search.value.toLowerCase();
+  const s = statusFilter.value;
+  const f = fileFilter.value;
+  return rows.filter(r=>{
+    const matchQ = !q || r.file.toLowerCase().includes(q) || r.check.toLowerCase().includes(q) || r.message.toLowerCase().includes(q);
+    const matchS = (s==='ALL') || (r.status===s);
+    const matchF = (f==='ALL') || (r.file===f);
+    return matchQ && matchS && matchF;
+  });
+}
+
+function renderTable(data){
+  tbody.innerHTML = '';
+  data.forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.className = 'border-b last:border-0';
+    tr.innerHTML = `
+      <td class="px-4 py-2 align-top whitespace-nowrap">${r.file}</td>
+      <td class="px-4 py-2 align-top">${r.check}</td>
+      <td class="px-4 py-2 align-top"><span class="badge status-${r.status}">${r.status}</span></td>
+      <td class="px-4 py-2 align-top">${r.message||''}</td>
+      <td class="px-4 py-2 align-top text-right">${(r.duration_ms/1000).toFixed(2)} s</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderPerFile(){
+  perFile.innerHTML = '';
+  const files = [...new Set(rows.map(r=>r.file))];
+  // fill filter dropdown
+  fileFilter.innerHTML = '<option value="ALL">Datei: Alle</option>' + files.map(f=>`<option value="${f}">${f}</option>`).join('');
+
+  for (const file of files){
+    const related = rows.filter(r=>r.file===file);
+    const fails = related.filter(r=>r.status==='FAIL').length;
+    const warns = related.filter(r=>r.status==='WARN').length;
+    const passes= related.filter(r=>r.status==='PASS').length;
+    const sec = document.createElement('details');
+    sec.className='bg-white rounded-2xl shadow';
+    sec.innerHTML = `
+      <summary class="cursor-pointer select-none px-4 py-3 flex items-center justify-between">
+        <div class="font-semibold">${file}</div>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="badge status-FAIL">FAIL ${fails}</span>
+          <span class="badge status-WARN">WARN ${warns}</span>
+          <span class="badge status-PASS">PASS ${passes}</span>
+          <span class="chev transition">▶</span>
+        </div>
+      </summary>
+      <div class="px-4 pb-4">
+        <ul class="list-disc ml-5 text-sm">
+          ${related.map(r=>`<li><span class="badge status-${r.status}">${r.status}</span> <strong>${r.check}</strong> – ${r.message||''}</li>`).join('')}
+        </ul>
+      </div>`;
+    perFile.appendChild(sec);
+  }
+}
+
+async function loadReport(){
+  const res = await fetch('data/latest.json?ts=' + Date.now(), { cache: 'no-store' });
+  report = await res.json();
+  rows = toRows(report);
+  hydrateSummary(rows, report);
+  renderTable(applyFilters());
+  renderPerFile();
+}
+
+document.getElementById('btnRefresh').addEventListener('click', loadReport);
+document.getElementById('btnExportCSV').addEventListener('click', ()=>{
+  const d = applyFilters();
+  const csv = ['Datei;Prüfung;Status;Nachricht;Dauer_s']
+    .concat(d.map(r=>[r.file, r.check, r.status, (r.message||'').replaceAll(';',','), (r.duration_ms/1000).toFixed(2)].join(';')))
+    .join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'nx-report.csv'; a.click(); URL.revokeObjectURL(url);
+});
+document.getElementById('btnExportJSON').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(report, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'nx-report.json'; a.click(); URL.revokeObjectURL(url);
+});
+
+// Initial load
+loadReport();
+</script>
+</body>
+</html>

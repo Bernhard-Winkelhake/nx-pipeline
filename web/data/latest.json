@@ -1,0 +1,30 @@
+{
+  "project": "Wokshop_Construction-Space",
+  "root": "C:\\nx-quality\\bin\\nx-testpipeline",
+  "timestamp": "2025-08-20 01:14:53",
+  "files": {
+    "C:\\nx-quality\\bin\\nx-testpipeline\\NX_Starter_Part_v0.8-alpha.prt": [
+      {
+        "id": "CHK_PLANE",
+        "name": "Datum planes on expected layer",
+        "status": "FAIL",
+        "message": "NOT OK: 4 datum planes on layer 62 or none present.",
+        "duration_ms": 0
+      },
+      {
+        "id": "CHK_SKETCH",
+        "name": "Sketches on expected layer",
+        "status": "PASS",
+        "message": "OK: 0 sketches on layer 21 or none present.",
+        "duration_ms": 0
+      },
+      {
+        "id": "CHK_BUYPART",
+        "name": "Buy-part attribute",
+        "status": "PASS",
+        "message": "Buy-part check finished.",
+        "duration_ms": 10
+      }
+    ]
+  }
+}

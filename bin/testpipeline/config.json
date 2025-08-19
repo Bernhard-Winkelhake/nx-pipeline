@@ -1,0 +1,16 @@
+{
+  "layers": {
+    "plane": 62,
+    "sketch": 21,
+    "solid_hole": 3
+  },
+  "attributes": {
+    "buy_part_flag": "isBuyPart"
+  },
+  "checks": {
+    "enable_plane_check": true,
+    "enable_sketch_check": true,
+    "enable_solid_check": false,
+    "enable_buy_part_check": true
+  }
+}

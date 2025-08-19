@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NX Prüfungsreport</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🧩</text></svg>">
+  <style>
+    .status-PASS { background:#dcfce7; color:#166534; }
+    .status-FAIL { background:#fee2e2; color:#991b1b; }
+    .status-WARN { background:#fef9c3; color:#854d0e; }
+    .badge { border-radius:9999px; padding:0.125rem 0.5rem; font-weight:600; font-size:0.75rem; }
+    .row { border-bottom:1px solid #e5e7eb; }
+    .row:hover { background:#f8fafc; }
+    .file-card { background:#fff; border-radius:1rem; box-shadow:0 1px 2px rgba(0,0,0,.06); padding:.75rem 1rem; display:flex; align-items:center; justify-content:space-between; }
+    .file-path { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:75ch; }
+    .icon-btn { width:28px; height:28px; border-radius:9999px; display:inline-flex; align-items:center; justify-content:center; background:#f1f5f9; }
+    .icon-btn:hover { background:#e2e8f0; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+    <!-- Header -->
+    <header class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">NX Prüfungsreport</h1>
+        <p class="text-sm text-slate-500">Beispielhafte HTML-Auswertung – lädt <code>data/latest.json</code></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnExportCSV" class="px-3 py-2 rounded-xl shadow bg-white hover:bg-slate-100 text-sm">CSV exportieren</button>
+        <button id="btnExportJSON" class="px-3 py-2 rounded-xl shadow bg-white hover:bg-slate-100 text-sm">JSON exportieren</button>
+        <button id="btnRefresh" class="px-3 py-2 rounded-xl shadow bg-white hover:bg-slate-100 text-sm">Neu laden</button>
+      </div>
+    </header>
+
+    <!-- Summary Cards -->
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Projekt</div><div id="sumProject" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Zeitstempel</div><div id="sumTimestamp" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Dateien</div><div id="sumFiles" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4"><div class="text-xs text-slate-500">Prüfungen</div><div id="sumChecks" class="text-lg font-semibold">—</div></div>
+      <div class="rounded-2xl bg-white shadow p-4 flex items-center gap-2">
+        <span class="badge status-PASS">PASS <span id="sumPass">0</span></span>
+        <span class="badge status-WARN">WARN <span id="sumWarn">0</span></span>
+        <span class="badge status-FAIL">FAIL <span id="sumFail">0</span></span>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="flex flex-col md:flex-row gap-3">
+      <input id="search" type="search" placeholder="Suche nach Datei oder Prüfung…" class="w-full md:w-80 px-3 py-2 rounded-xl bg-white shadow outline-none focus:ring" />
+      <select id="statusFilter" class="px-3 py-2 rounded-xl bg-white shadow w-full md:w-48">
+        <option value="ALL">Status: Alle</option>
+        <option value="PASS">Nur PASS</option>
+        <option value="WARN">Nur WARN</option>
+        <option value="FAIL">Nur FAIL</option>
+      </select>
+      <select id="fileFilter" class="px-3 py-2 rounded-xl bg-white shadow w-full md:w-64">
+        <option value="ALL">Datei: Alle</option>
+      </select>
+    </section>
+
+    <!-- Dateien-Liste (Parts-Listing) -->
+    <section id="filesSection" class="rounded-2xl bg-white shadow p-4 hidden">
+      <h2 class="font-semibold mb-2">Gefundene Dateien</h2>
+      <div class="mb-3 text-sm text-slate-500">Quelle: <code>files[].name</code> / <code>files[].path</code></div>
+      <input id="fileSearch" type="search" placeholder="Dateinamen filtern…" class="w-full md:w-80 px-3 py-2 rounded-xl bg-white shadow outline-none focus:ring mb-3" />
+      <ul id="fileList" class="list-disc ml-5 text-sm space-y-1"></ul>
+    </section>
+
+    <!-- Tabelle (Prüf-Report) -->
+    <section id="tableSection" class="rounded-2xl bg-white shadow overflow-hidden">
+      <div class="max-h-[60vh] overflow-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-100 sticky top-0">
+            <tr>
+              <th class="text-left font-semibold px-4 py-2">Datei</th>
+              <th class="text-left font-semibold px-4 py-2">Prüfung</th>
+              <
